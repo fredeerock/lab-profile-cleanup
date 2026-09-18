@@ -1,7 +1,7 @@
 # Lab profile cleanup
 
 Frees disk space on shared Windows machines by deleting cached user profiles that haven't
-been used on that machine since a cutoff date (default **2026-08-15**).
+been used on that machine since a date you pick.
 
 It shows you what it found, asks before deleting, then deletes.
 
@@ -19,13 +19,15 @@ Delete these profiles? This cannot be undone [y/N]:
 
 ## Usage
 
-Run in an elevated PowerShell window:
+Run in an elevated PowerShell window. The cutoff date is required — there's no default.
 
 ```powershell
-.\Remove-StaleProfiles.ps1                          # default cutoff
-.\Remove-StaleProfiles.ps1 -CutoffDate '2026-06-01' # different cutoff
-.\Remove-StaleProfiles.ps1 -Force                   # skip the prompt
+.\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15
+.\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15 -Protect labadmin,imaging
+.\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15 -Force   # skip the prompt
 ```
+
+Leave off `-CutoffDate` and the script prints the usage and exits without touching anything.
 
 ## What it deletes
 
@@ -45,16 +47,18 @@ System and service profiles, any profile currently signed in, anything outside `
 `Default`/`Public`, the account running the script, `Administrator`, `DefaultAccount`,
 `WDAGUtilityAccount`, `defaultuser0`, and profiles with no logon history at all.
 
-To protect your own admin accounts, copy `protected-accounts.example.txt` to
-**`protected-accounts.txt`** next to the script and list them one per line:
+To protect your own admin and service accounts, either pass `-Protect labadmin,imaging`, or
+add them to the list near the top of the script so nobody has to remember the flag:
 
+```powershell
+$protected = @(
+    'Administrator'
+    'DefaultAccount'
+    'WDAGUtilityAccount'
+    'defaultuser0'
+    'labadmin'
+)
 ```
-labadmin
-imaging
-```
-
-The script loads it automatically every run, so protection doesn't depend on remembering a
-flag. It's gitignored, so your account names stay out of the repo.
 
 ## Notes
 

@@ -1,8 +1,0 @@
-# Accounts that must never have their profile deleted.
-# One account name or SID per line. Anything after a # is ignored.
-#
-# Copy this file to protected-accounts.txt next to Remove-StaleProfiles.ps1.
-# Windows built-ins are already protected and don't need listing here.
-
-# labadmin
-# imaging

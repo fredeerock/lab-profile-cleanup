@@ -12,39 +12,81 @@
     into this machine again they get a fresh profile.
 
 .PARAMETER CutoffDate
-    Profiles last used before this date are stale. Default: 2026-08-15.
+    Required. Profiles last used before this date are stale. Format: yyyy-MM-dd.
+
+.PARAMETER Protect
+    Accounts to never delete, on top of the built-in list. Names or SIDs.
 
 .PARAMETER Force
     Skip the confirmation prompt. Needed when running non-interactively.
 
 .EXAMPLE
-    .\Remove-StaleProfiles.ps1
+    .\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15
 
 .EXAMPLE
-    .\Remove-StaleProfiles.ps1 -CutoffDate '2026-06-01'
+    .\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15 -Protect labadmin,imaging
 #>
 
 [CmdletBinding()]
 param(
-    [datetime] $CutoffDate = '2026-08-15',
+    [string]   $CutoffDate,
+    [string[]] $Protect = @(),
     [switch]   $Force
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-# Windows built-ins that must never be deleted. Your own admin and service accounts go in
-# protected-accounts.txt next to this script, so protection doesn't depend on a flag.
-$protected = @('Administrator', 'DefaultAccount', 'WDAGUtilityAccount', 'defaultuser0')
+# Cutoff is required and has no default -- deleting profiles against a date nobody chose
+# is exactly the kind of accident this script should not enable.
+function Show-Usage {
+    param([string] $Problem)
 
-$protectedFile = if ($PSScriptRoot) { Join-Path $PSScriptRoot 'protected-accounts.txt' } else { $null }
-if ($protectedFile -and (Test-Path -LiteralPath $protectedFile)) {
-    $protected += @(
-        Get-Content -LiteralPath $protectedFile |
-            ForEach-Object { ($_ -split '#')[0].Trim() } |
-            Where-Object { $_ -ne '' }
-    )
+    Write-Host ''
+    Write-Host $Problem -ForegroundColor Red
+    Write-Host ''
+    Write-Host 'Profiles not used on this machine since the cutoff date will be deleted.'
+    Write-Host ''
+    Write-Host '  Usage:    .\Remove-StaleProfiles.ps1 -CutoffDate <yyyy-MM-dd>'
+    Write-Host ''
+    Write-Host '  Example:  .\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15'
+    Write-Host '            .\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15 -Protect labadmin'
+    Write-Host '            .\Remove-StaleProfiles.ps1 -CutoffDate 2026-08-15 -Force   (no confirmation prompt)'
+    Write-Host ''
 }
+
+if ([string]::IsNullOrWhiteSpace($CutoffDate)) {
+    Show-Usage -Problem 'No cutoff date given.'
+    exit 1
+}
+
+$cutoff = [datetime]::MinValue
+if (-not [datetime]::TryParse($CutoffDate, [ref] $cutoff)) {
+    Show-Usage -Problem "Could not read '$CutoffDate' as a date."
+    exit 1
+}
+
+# A future date makes every profile stale. Usually a typo in the year.
+if ($cutoff -gt (Get-Date)) {
+    Write-Host ''
+    Write-Host "Warning: $($cutoff.ToString('yyyy-MM-dd')) is in the future, so every profile counts as stale." -ForegroundColor Yellow
+}
+
+# Accounts that are never deleted, no matter how long they've been idle.
+#
+# Add your own admin and service accounts to this list, or pass them at run time with
+# -Protect. Either works. Editing the list means nobody has to remember the flag.
+#
+# Names are matched against the SID, the DOMAIN\user name, the bare user name, and the
+# profile folder name, case-insensitively.
+$protected = @(
+    'Administrator'
+    'DefaultAccount'
+    'WDAGUtilityAccount'
+    'defaultuser0'
+    # 'labadmin'
+    # 'imaging'
+) + $Protect
 
 # --------------------------------------------------------------------------------------
 
@@ -113,7 +155,7 @@ $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $usersRoot   = Join-Path $env:SystemDrive 'Users'
 
 Write-Host ''
-Write-Host "Checking profiles on $env:COMPUTERNAME not used since $($CutoffDate.ToString('yyyy-MM-dd'))..." -ForegroundColor Cyan
+Write-Host "Checking profiles on $env:COMPUTERNAME not used since $($cutoff.ToString('yyyy-MM-dd'))..." -ForegroundColor Cyan
 Write-Host ''
 
 # Find stale profiles -------------------------------------------------------------------
@@ -144,7 +186,7 @@ foreach ($userProfile in Get-CimInstance -ClassName Win32_UserProfile) {
     # No logon history means no evidence it's stale, so leave it alone.
     $lastUsed = Get-LastUseDate -UserProfile $userProfile
     if ($null -eq $lastUsed)      { continue }
-    if ($lastUsed -ge $CutoffDate) { continue }
+    if ($lastUsed -ge $cutoff) { continue }
 
     $stale.Add([pscustomobject]@{
         Account     = $account
