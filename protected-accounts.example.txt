@@ -1,0 +1,16 @@
+# Accounts that must never have their profile deleted on this site's machines.
+#
+# One account name or SID per line. Names are matched case-insensitively against the
+# SID, the DOMAIN\user name, the bare user name, and the profile folder name.
+# Everything after a # is ignored.
+#
+# Copy this file to protected-accounts.txt next to Remove-StaleProfiles.ps1 and add
+# your own admin and service accounts. protected-accounts.txt is gitignored so site
+# details stay out of the repo.
+#
+# Windows built-ins (Administrator, DefaultAccount, WDAGUtilityAccount, defaultuser0)
+# are already protected in the script and do not need to be listed here.
+
+# labadmin
+# imaging
+# S-1-5-21-1111111111-2222222222-3333333333-1001

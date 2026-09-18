@@ -1,0 +1,6 @@
+# Site-specific protected account list - never commit real account names.
+protected-accounts.txt
+
+# Local run output
+*.csv
+*.log
